@@ -221,3 +221,22 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# FAST RideMatch - Additional project rules
+
+# React Native / Expo
+node_modules/
+.expo/
+.expo-shared/
+web-build/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment configuration
+.env.*
+
+# Local development files
+*.log
