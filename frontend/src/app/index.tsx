@@ -6,6 +6,8 @@ import {
   Text,
   View,
   Pressable,
+  Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -85,15 +87,50 @@ const safetyContent = {
   },
 };
 
+const emergencyContacts = [
+  {
+    name: 'Police Emergency',
+    number: '15',
+    description: 'For immediate police assistance.',
+    emoji: '👮',
+    color: COLORS.blue,
+  },
+  {
+    name: 'Rescue 1122',
+    number: '1122',
+    description: 'For ambulance, rescue and fire emergencies.',
+    emoji: '🚑',
+    color: COLORS.pink,
+  },
+  {
+    name: 'Islamabad Traffic Police',
+    number: '1915',
+    description: 'For traffic-related assistance.',
+    emoji: '🚦',
+    color: COLORS.yellow,
+  },
+];
+
 type SectionKey = keyof typeof safetyContent;
+type SelectedSection = SectionKey | 'emergency' | null;
 
 export default function HomeScreen() {
   const [selectedSection, setSelectedSection] =
-    useState<SectionKey | null>(null);
+    useState<SelectedSection>(null);
 
-  const selectedContent = selectedSection
-    ? safetyContent[selectedSection]
-    : null;
+  const selectedContent =
+    selectedSection && selectedSection !== 'emergency'
+      ? safetyContent[selectedSection]
+      : null;
+
+  const callEmergencyNumber = (number: string) => {
+    Linking.openURL(`tel:${number}`).catch(() => {
+      Alert.alert(
+        'Unable to open phone',
+        `Please dial ${number} manually from your phone.`
+      );
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -103,13 +140,93 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
       >
-        {selectedContent ? (
+        {selectedSection === 'emergency' ? (
           <View>
             <Pressable
               onPress={() => setSelectedSection(null)}
               style={styles.backButton}
             >
-              <Text style={styles.backText}>‹  Back to safety guide</Text>
+              <Text style={styles.backText}>
+                ‹  Back to safety guide
+              </Text>
+            </Pressable>
+
+            <Text style={styles.detailTitle}>
+              Emergency help 🆘
+            </Text>
+
+            <Text style={styles.detailSubtitle}>
+              Important emergency contacts for Islamabad.
+              Keep these numbers accessible.
+            </Text>
+
+            <View style={styles.warningCard}>
+              <Text style={styles.warningTitle}>
+                In immediate danger?
+              </Text>
+              <Text style={styles.warningText}>
+                Move to a safe public place if possible and contact
+                the appropriate emergency service immediately.
+              </Text>
+            </View>
+
+            <Text style={styles.contactHeading}>
+              Emergency contacts
+            </Text>
+
+            {emergencyContacts.map((contact) => (
+              <View key={contact.number} style={styles.contactCard}>
+                <View
+                  style={[
+                    styles.contactIcon,
+                    { backgroundColor: contact.color },
+                  ]}
+                >
+                  <Text style={styles.contactEmoji}>
+                    {contact.emoji}
+                  </Text>
+                </View>
+
+                <View style={styles.contactContent}>
+                  <Text style={styles.contactName}>
+                    {contact.name}
+                  </Text>
+                  <Text style={styles.contactDescription}>
+                    {contact.description}
+                  </Text>
+                  <Text style={styles.contactNumber}>
+                    {contact.number}
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={styles.callButton}
+                  onPress={() => callEmergencyNumber(contact.number)}
+                >
+                  <Text style={styles.callButtonText}>
+                    Call
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+
+            <View style={styles.reminderCard}>
+              <Text style={styles.reminderEmoji}>💛</Text>
+              <Text style={styles.reminderText}>
+                These buttons open your device's phone app.
+                They do not automatically contact emergency services.
+              </Text>
+            </View>
+          </View>
+        ) : selectedContent ? (
+          <View>
+            <Pressable
+              onPress={() => setSelectedSection(null)}
+              style={styles.backButton}
+            >
+              <Text style={styles.backText}>
+                ‹  Back to safety guide
+              </Text>
             </Pressable>
 
             <Text style={styles.detailTitle}>
@@ -225,7 +342,13 @@ export default function HomeScreen() {
             ))}
 
             {/* Emergency information */}
-            <View style={styles.emergencyCard}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.emergencyCard,
+                pressed && styles.cardPressed,
+              ]}
+              onPress={() => setSelectedSection('emergency')}
+            >
               <View style={styles.emergencyTop}>
                 <Text style={styles.emergencyEmoji}>🆘</Text>
                 <Text style={styles.emergencyLabel}>
@@ -238,10 +361,14 @@ export default function HomeScreen() {
               </Text>
 
               <Text style={styles.emergencyDescription}>
-                Keep emergency contacts accessible and know who to
-                reach if something goes wrong during your journey.
+                Find important emergency contacts and get help when
+                you need it.
               </Text>
-            </View>
+
+              <Text style={styles.emergencyLink}>
+                View emergency contacts  →
+              </Text>
+            </Pressable>
 
             <Text style={styles.footer}>
               Ride together. Ride responsibly. 💚
@@ -428,6 +555,12 @@ const styles = StyleSheet.create({
     color: '#53677F',
     marginTop: 8,
   },
+  emergencyLink: {
+    color: '#405D7A',
+    fontWeight: '800',
+    fontSize: 13,
+    marginTop: 15,
+  },
   footer: {
     textAlign: 'center',
     color: COLORS.muted,
@@ -453,6 +586,7 @@ const styles = StyleSheet.create({
   },
   detailSubtitle: {
     fontSize: 14,
+    lineHeight: 21,
     color: COLORS.muted,
     marginBottom: 25,
   },
@@ -502,5 +636,81 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: '#66572F',
+  },
+  warningCard: {
+    backgroundColor: '#FCE7E7',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 25,
+  },
+  warningTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#873F3F',
+    marginBottom: 7,
+  },
+  warningText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#744B4B',
+  },
+  contactHeading: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 14,
+  },
+  contactCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  contactIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactEmoji: {
+    fontSize: 23,
+  },
+  contactContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  contactName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  contactDescription: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: COLORS.muted,
+    marginTop: 3,
+  },
+  contactNumber: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#536C8B',
+    marginTop: 5,
+  },
+  callButton: {
+    backgroundColor: COLORS.sage,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  callButtonText: {
+    color: '#263B2B',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
