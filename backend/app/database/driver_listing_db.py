@@ -32,6 +32,7 @@ def initialize_driver_listing_table():
             )
         """)
 
+
 def save_ride_listing(listing):
     with get_connection() as connection:
         cursor = connection.execute(
@@ -61,6 +62,7 @@ def save_ride_listing(listing):
         connection.commit()
         return cursor.lastrowid
 
+
 def get_ride_listing(listing_id: int):
     with get_connection() as connection:
         cursor = connection.execute(
@@ -78,3 +80,37 @@ def get_ride_listing(listing_id: int):
             return None
 
         return dict(row)
+
+def update_ride_listing(listing_id: int, listing):
+    """
+    Update an existing ride listing.
+
+    The driver_id is intentionally not updated.
+    Ownership must be checked by the API before
+    calling this function.
+    """
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE ride_listings
+            SET
+                start_area = ?,
+                destination_area = ?,
+                departure_time = ?,
+                available_seats = ?,
+                vehicle_details = ?,
+                fare = ?
+            WHERE id = ?
+            """,
+            (
+                listing.start_area,
+                listing.destination_area,
+                listing.departure_time.isoformat(),
+                listing.available_seats,
+                listing.vehicle_details,
+                listing.fare,
+                listing_id
+            )
+        )
+        connection.commit()
+        return cursor.rowcount > 0
