@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -8,9 +8,12 @@ import {
   Pressable,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+
+const API_URL = 'http://127.0.0.1:8000';
 
 const COLORS = {
   background: '#FAFAF7',
@@ -23,6 +26,22 @@ const COLORS = {
   muted: '#778078',
   border: '#ECEEE8',
 };
+
+type SectionKey = 'before' | 'during' | 'after';
+
+type SafetySection = {
+  title: string;
+  description: string;
+  tips: string[];
+};
+
+type EmergencyContact = {
+  name: string;
+  number: string;
+  description: string;
+};
+
+type SafetyGuidance = Record<SectionKey, SafetySection>;
 
 const safetySections = [
   {
@@ -51,76 +70,59 @@ const safetySections = [
   },
 ];
 
-const safetyContent = {
-  before: {
-    title: 'Before your ride 🌼',
-    subtitle: 'A little preparation goes a long way.',
-    tips: [
-      'Verify the driver and vehicle details before entering.',
-      'Share your trip details with someone you trust.',
-      'Keep your phone charged and accessible.',
-      'Confirm your pickup and drop-off locations.',
-      'Avoid sharing unnecessary personal information.',
-    ],
-  },
-  during: {
-    title: 'During your ride 🚗',
-    subtitle: 'Stay aware throughout your journey.',
-    tips: [
-      'Wear your seatbelt throughout the ride.',
-      'Keep your belongings close to you.',
-      'Follow the planned route and stay aware of your surroundings.',
-      'Avoid distracting the driver.',
-      'Contact someone you trust if you feel uncomfortable.',
-    ],
-  },
-  after: {
-    title: 'After your ride 🌸',
-    subtitle: 'Finish your journey safely.',
-    tips: [
-      'Make sure you have collected all your belongings.',
-      'Exit the vehicle in a safe and suitable location.',
-      'Let someone know when you have reached your destination.',
-      'Report any inappropriate or unsafe behaviour.',
-      'Share feedback about your ride when appropriate.',
-    ],
-  },
-};
-
-const emergencyContacts = [
-  {
-    name: 'Police Emergency',
-    number: '15',
-    description: 'For immediate police assistance.',
-    emoji: '👮',
-    color: COLORS.blue,
-  },
-  {
-    name: 'Rescue 1122',
-    number: '1122',
-    description: 'For ambulance, rescue and fire emergencies.',
-    emoji: '🚑',
-    color: COLORS.pink,
-  },
-  {
-    name: 'Islamabad Traffic Police',
-    number: '1915',
-    description: 'For traffic-related assistance.',
-    emoji: '🚦',
-    color: COLORS.yellow,
-  },
-];
-
-type SectionKey = keyof typeof safetyContent;
 type SelectedSection = SectionKey | 'emergency' | null;
 
 export default function HomeScreen() {
   const [selectedSection, setSelectedSection] =
     useState<SelectedSection>(null);
 
+  const [guidance, setGuidance] =
+    useState<SafetyGuidance | null>(null);
+
+  const [emergencyContacts, setEmergencyContacts] =
+    useState<EmergencyContact[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadSafetyData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const [guidanceResponse, contactsResponse] = await Promise.all([
+        fetch(`${API_URL}/api/safety/guidance`),
+        fetch(`${API_URL}/api/safety/emergency-contacts`),
+      ]);
+
+      if (!guidanceResponse.ok || !contactsResponse.ok) {
+        throw new Error('Unable to retrieve safety information.');
+      }
+
+      const guidanceData: SafetyGuidance =
+        await guidanceResponse.json();
+
+      const contactsData: EmergencyContact[] =
+        await contactsResponse.json();
+
+      setGuidance(guidanceData);
+      setEmergencyContacts(contactsData);
+    } catch (err) {
+      setError(
+        'Could not connect to the safety server. Please make sure the backend is running.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSafetyData();
+  }, []);
+
   const selectedContent =
-    selectedSection && selectedSection !== 'emergency'
-      ? safetyContent[selectedSection]
+    selectedSection && selectedSection !== 'emergency' && guidance
+      ? guidance[selectedSection]
       : null;
 
   const callEmergencyNumber = (number: string) => {
@@ -130,6 +132,16 @@ export default function HomeScreen() {
         `Please dial ${number} manually from your phone.`
       );
     });
+  };
+
+  const getContactStyle = (index: number) => {
+    const styles = [
+      { emoji: '👮', color: COLORS.blue },
+      { emoji: '🚑', color: COLORS.pink },
+      { emoji: '🚦', color: COLORS.yellow },
+    ];
+
+    return styles[index % styles.length];
   };
 
   return (
@@ -174,41 +186,53 @@ export default function HomeScreen() {
               Emergency contacts
             </Text>
 
-            {emergencyContacts.map((contact) => (
-              <View key={contact.number} style={styles.contactCard}>
-                <View
-                  style={[
-                    styles.contactIcon,
-                    { backgroundColor: contact.color },
-                  ]}
-                >
-                  <Text style={styles.contactEmoji}>
-                    {contact.emoji}
-                  </Text>
-                </View>
+            {loading ? (
+              <ActivityIndicator size="large" color="#647D69" />
+            ) : error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              emergencyContacts.map((contact, index) => {
+                const contactStyle = getContactStyle(index);
 
-                <View style={styles.contactContent}>
-                  <Text style={styles.contactName}>
-                    {contact.name}
-                  </Text>
-                  <Text style={styles.contactDescription}>
-                    {contact.description}
-                  </Text>
-                  <Text style={styles.contactNumber}>
-                    {contact.number}
-                  </Text>
-                </View>
+                return (
+                  <View key={contact.number} style={styles.contactCard}>
+                    <View
+                      style={[
+                        styles.contactIcon,
+                        { backgroundColor: contactStyle.color },
+                      ]}
+                    >
+                      <Text style={styles.contactEmoji}>
+                        {contactStyle.emoji}
+                      </Text>
+                    </View>
 
-                <Pressable
-                  style={styles.callButton}
-                  onPress={() => callEmergencyNumber(contact.number)}
-                >
-                  <Text style={styles.callButtonText}>
-                    Call
-                  </Text>
-                </Pressable>
-              </View>
-            ))}
+                    <View style={styles.contactContent}>
+                      <Text style={styles.contactName}>
+                        {contact.name}
+                      </Text>
+                      <Text style={styles.contactDescription}>
+                        {contact.description}
+                      </Text>
+                      <Text style={styles.contactNumber}>
+                        {contact.number}
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      style={styles.callButton}
+                      onPress={() =>
+                        callEmergencyNumber(contact.number)
+                      }
+                    >
+                      <Text style={styles.callButtonText}>
+                        Call
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })
+            )}
 
             <View style={styles.reminderCard}>
               <Text style={styles.reminderEmoji}>💛</Text>
@@ -234,7 +258,7 @@ export default function HomeScreen() {
             </Text>
 
             <Text style={styles.detailSubtitle}>
-              {selectedContent.subtitle}
+              {selectedContent.description}
             </Text>
 
             {selectedContent.tips.map((tip, index) => (
@@ -303,72 +327,95 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {safetySections.map((section) => (
-              <Pressable
-                key={section.number}
-                style={({ pressed }) => [
-                  styles.safetyCard,
-                  pressed && styles.cardPressed,
-                ]}
-                onPress={() => setSelectedSection(section.key)}
-              >
-                <View
-                  style={[
-                    styles.cardIcon,
-                    { backgroundColor: section.color },
-                  ]}
-                >
-                  <Text style={styles.cardEmoji}>
-                    {section.emoji}
-                  </Text>
-                </View>
-
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardNumber}>
-                    STEP {section.number}
-                  </Text>
-
-                  <Text style={styles.cardTitle}>
-                    {section.title}
-                  </Text>
-
-                  <Text style={styles.cardDescription}>
-                    {section.description}
-                  </Text>
-                </View>
-
-                <Text style={styles.cardArrow}>›</Text>
-              </Pressable>
-            ))}
-
-            {/* Emergency information */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.emergencyCard,
-                pressed && styles.cardPressed,
-              ]}
-              onPress={() => setSelectedSection('emergency')}
-            >
-              <View style={styles.emergencyTop}>
-                <Text style={styles.emergencyEmoji}>🆘</Text>
-                <Text style={styles.emergencyLabel}>
-                  IMPORTANT
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#647D69" />
+                <Text style={styles.loadingText}>
+                  Loading safety guidance...
                 </Text>
               </View>
+            ) : error ? (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>{error}</Text>
+                <Pressable
+                  style={styles.retryButton}
+                  onPress={loadSafetyData}
+                >
+                  <Text style={styles.retryButtonText}>
+                    Try again
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                {safetySections.map((section) => (
+                  <Pressable
+                    key={section.number}
+                    style={({ pressed }) => [
+                      styles.safetyCard,
+                      pressed && styles.cardPressed,
+                    ]}
+                    onPress={() => setSelectedSection(section.key)}
+                  >
+                    <View
+                      style={[
+                        styles.cardIcon,
+                        { backgroundColor: section.color },
+                      ]}
+                    >
+                      <Text style={styles.cardEmoji}>
+                        {section.emoji}
+                      </Text>
+                    </View>
 
-              <Text style={styles.emergencyTitle}>
-                Need help in an emergency?
-              </Text>
+                    <View style={styles.cardContent}>
+                      <Text style={styles.cardNumber}>
+                        STEP {section.number}
+                      </Text>
 
-              <Text style={styles.emergencyDescription}>
-                Find important emergency contacts and get help when
-                you need it.
-              </Text>
+                      <Text style={styles.cardTitle}>
+                        {section.title}
+                      </Text>
 
-              <Text style={styles.emergencyLink}>
-                View emergency contacts  →
-              </Text>
-            </Pressable>
+                      <Text style={styles.cardDescription}>
+                        {section.description}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.cardArrow}>›</Text>
+                  </Pressable>
+                ))}
+
+                {/* Emergency information */}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.emergencyCard,
+                    pressed && styles.cardPressed,
+                  ]}
+                  onPress={() => setSelectedSection('emergency')}
+                >
+                  <View style={styles.emergencyTop}>
+                    <Text style={styles.emergencyEmoji}>🆘</Text>
+                    <Text style={styles.emergencyLabel}>
+                      IMPORTANT
+                    </Text>
+                  </View>
+
+                  <Text style={styles.emergencyTitle}>
+                    Need help in an emergency?
+                  </Text>
+
+                  <Text style={styles.emergencyDescription}>
+                    Find important emergency contacts and get help when
+                    you need it.
+                  </Text>
+
+                  <Text style={styles.emergencyLink}>
+                    View emergency contacts  →
+                  </Text>
+                </Pressable>
+              </>
+            )}
 
             <Text style={styles.footer}>
               Ride together. Ride responsibly. 💚
@@ -711,6 +758,37 @@ const styles = StyleSheet.create({
   callButtonText: {
     color: '#263B2B',
     fontSize: 12,
+    fontWeight: '800',
+  },
+  loadingContainer: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: COLORS.muted,
+    fontSize: 13,
+    marginTop: 12,
+  },
+  errorCard: {
+    backgroundColor: '#FCE7E7',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 15,
+  },
+  errorText: {
+    color: '#873F3F',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: COLORS.sage,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  retryButtonText: {
+    color: '#263B2B',
     fontWeight: '800',
   },
 });
