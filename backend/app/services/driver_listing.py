@@ -1,11 +1,13 @@
-
 from datetime import datetime, timezone
 
-from app.schemas.ride_listing import RideListingCreate
+from app.schemas.ride_listing import (
+    RideListingCreate,
+    RideListingUpdate
+)
 
 
 def validate_driver_listing(
-    listing: RideListingCreate,
+    listing: RideListingCreate | RideListingUpdate,
     is_verified_student: bool
 ) -> None:
     """
@@ -25,12 +27,20 @@ def validate_driver_listing(
     if not listing.destination_area.strip():
         raise ValueError("Destination area is required.")
 
+    if (
+        listing.start_area.strip().casefold()
+        == listing.destination_area.strip().casefold()
+    ):
+        raise ValueError(
+            "Starting area and destination must be different."
+        )
+
     if not listing.vehicle_details.strip():
         raise ValueError("Vehicle details are required.")
 
     departure = listing.departure_time
 
-    if departure.tzinfo is None:
+    if departure.tzinfo is None or departure.utcoffset() is None:
         raise ValueError(
             "Departure time must include a timezone."
         )
