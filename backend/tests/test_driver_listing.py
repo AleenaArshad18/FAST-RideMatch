@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from pydantic import ValidationError
 
 from app.schemas.ride_listing import RideListingCreate
 from app.services.driver_listing import validate_driver_listing
@@ -68,3 +69,93 @@ def test_past_departure_is_rejected():
             is_verified_student=True
         )
 
+# Test 5: Empty destination is rejected
+def test_empty_destination_is_rejected():
+    listing = make_valid_listing()
+    listing.destination_area = "   "
+
+    with pytest.raises(ValueError, match="Destination area"):
+        validate_driver_listing(
+            listing,
+            is_verified_student=True
+        )
+
+
+# Test 6: Identical locations are rejected
+def test_same_locations_are_rejected():
+    listing = make_valid_listing()
+    listing.destination_area = " islamabad "
+
+    with pytest.raises(ValueError, match="must be different"):
+        validate_driver_listing(
+            listing,
+            is_verified_student=True
+        )
+
+
+# Test 7: Empty vehicle details are rejected
+def test_empty_vehicle_details_are_rejected():
+    listing = make_valid_listing()
+    listing.vehicle_details = "   "
+
+    with pytest.raises(ValueError, match="Vehicle details"):
+        validate_driver_listing(
+            listing,
+            is_verified_student=True
+        )
+
+
+# Test 8: Departure without timezone is rejected
+def test_missing_timezone_is_rejected():
+    listing = make_valid_listing()
+    listing.departure_time = (
+        listing.departure_time.replace(tzinfo=None)
+    )
+
+    with pytest.raises(ValueError, match="timezone"):
+        validate_driver_listing(
+            listing,
+            is_verified_student=True
+        )
+
+
+# Test 9: Zero available seats are rejected
+def test_zero_seats_are_rejected():
+    data = make_valid_listing().model_dump()
+    data["available_seats"] = 0
+
+    with pytest.raises(ValidationError):
+        RideListingCreate(**data)
+
+
+# Test 10: Negative available seats are rejected
+def test_negative_seats_are_rejected():
+    data = make_valid_listing().model_dump()
+    data["available_seats"] = -2
+
+    with pytest.raises(ValidationError):
+        RideListingCreate(**data)
+
+
+# Test 11: Negative fare is rejected
+def test_negative_fare_is_rejected():
+    data = make_valid_listing().model_dump()
+    data["fare"] = -100
+
+    with pytest.raises(ValidationError):
+        RideListingCreate(**data)
+
+
+# Test 12: Free rides are allowed
+def test_zero_fare_is_allowed():
+    data = make_valid_listing().model_dump()
+    data["fare"] = 0
+
+    listing = RideListingCreate(**data)
+
+    validate_driver_listing(
+        listing,
+        is_verified_student=True
+    )
+
+    assert listing.fare == 0

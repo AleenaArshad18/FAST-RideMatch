@@ -52,3 +52,32 @@ def test_get_existing_ride_listing(tmp_path, monkeypatch):
     assert data["destination_area"] == "F-10"
     assert data["available_seats"] == 3
     assert data["fare"] == 250
+
+    # Test 2: Retrieve a nonexistent ride
+def test_get_nonexistent_ride_listing(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        driver_listing_db,
+        "DATABASE_PATH",
+        tmp_path / "test_rides.db"
+    )
+
+    driver_listing_db.initialize_driver_listing_table()
+
+    client = TestClient(app)
+
+    response = client.get("/ride-listings/999")
+
+    assert response.status_code == 404
+
+    assert response.json()["detail"] == (
+        "Ride listing not found."
+    )
+
+
+# Test 3: Reject an invalid listing ID
+def test_get_invalid_listing_id():
+    client = TestClient(app)
+
+    response = client.get("/ride-listings/abc")
+
+    assert response.status_code == 422

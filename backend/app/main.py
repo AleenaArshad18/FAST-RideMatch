@@ -29,7 +29,7 @@ app.include_router(driver_listing_router)
 @app.get("/")
 def home():
     return {
-        "message": "FAST RideMatch API is running"
+        "message": "Welcome to FAST RideMatch API"
     }
 
 
