@@ -2,8 +2,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers.safety import router as safety_router
 from app.routers.driver_listing import router as driver_listing_router
+from app.routers.safety import router as safety_router
 
 
 app = FastAPI(
@@ -12,6 +12,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Preserve the existing CORS configuration from main.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,6 +21,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Register both feature routers.
 app.include_router(safety_router)
 app.include_router(driver_listing_router)
 

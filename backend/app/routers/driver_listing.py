@@ -3,12 +3,16 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.database.driver_listing_db import (
     get_ride_listing,
-    save_ride_listing
+    save_ride_listing,
+    update_ride_listing
 )
+
 from app.schemas.ride_listing import (
     RideListingCreate,
+    RideListingUpdate,
     RideListingResponse
 )
+
 from app.services.driver_listing import validate_driver_listing
 
 
@@ -74,3 +78,28 @@ def retrieve_ride_listing(listing_id: int):
 
     return listing
 
+
+@router.put(
+    "/{listing_id}",
+    response_model=RideListingResponse
+)
+def edit_ride_listing(
+    listing_id: int,
+    listing: RideListingUpdate,
+    is_verified_student: bool = Depends(require_verified_student)
+):
+    existing_listing = get_ride_listing(listing_id)
+
+    if existing_listing is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Ride listing not found."
+        )
+
+    # Driver ownership must be verified using the
+    # authenticated student's identity.
+    # Until that integration exists, editing is blocked.
+    raise HTTPException(
+        status_code=503,
+        detail="Driver ownership verification is not configured."
+    )
