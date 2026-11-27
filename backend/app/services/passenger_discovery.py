@@ -18,6 +18,11 @@ def search_and_filter_rides(
     filtered_rides = []
 
     for ride in rides:
+
+        # Exclude completed and cancelled rides.
+        if ride.get("status", "active") != "active":
+            continue
+
         departure = datetime.fromisoformat(
             ride["departure_time"]
         )
