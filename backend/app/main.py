@@ -8,13 +8,23 @@ from app.database.driver_listing_db import (
     initialize_driver_listing_table
 )
 
-from app.routers.driver_listing import router as driver_listing_router
-from app.routers.safety import router as safety_router
+from app.routers.driver_listing import (
+    router as driver_listing_router
+)
+
+from app.routers.safety import (
+    router as safety_router
+)
+
+from app.routers.driver_reliability import (
+    router as driver_reliability_router
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create the database table when the backend starts.
+    # Create or migrate the database table
+    # when the backend starts.
     initialize_driver_listing_table()
     yield
 
@@ -26,6 +36,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
 # Preserve the existing CORS configuration.
 app.add_middleware(
     CORSMiddleware,
@@ -35,9 +46,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+
 # Register feature routers.
 app.include_router(safety_router)
 app.include_router(driver_listing_router)
+app.include_router(driver_reliability_router)
 
 
 @app.get("/")

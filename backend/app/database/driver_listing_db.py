@@ -28,9 +28,42 @@ def initialize_driver_listing_table():
                     CHECK (available_seats > 0),
                 vehicle_details TEXT NOT NULL,
                 fare REAL NOT NULL
-                    CHECK (fare >= 0)
+                    CHECK (fare >= 0),
+                status TEXT NOT NULL DEFAULT 'active'
+                    CHECK (
+                        status IN (
+                            'active',
+                            'completed',
+                            'cancelled'
+                        )
+                    )
             )
         """)
+
+        # Check whether an existing database needs migration.
+        columns = connection.execute(
+            "PRAGMA table_info(ride_listings)"
+        ).fetchall()
+
+        column_names = [
+            column["name"] for column in columns
+        ]
+
+        if "status" not in column_names:
+            connection.execute("""
+                ALTER TABLE ride_listings
+                ADD COLUMN status TEXT NOT NULL
+                    DEFAULT 'active'
+                    CHECK (
+                        status IN (
+                            'active',
+                            'completed',
+                            'cancelled'
+                        )
+                    )
+            """)
+
+        connection.commit()
 
 
 def save_ride_listing(listing):
@@ -81,6 +114,7 @@ def get_ride_listing(listing_id: int):
 
         return dict(row)
 
+
 def update_ride_listing(listing_id: int, listing):
     """
     Update an existing ride listing.
@@ -112,6 +146,7 @@ def update_ride_listing(listing_id: int, listing):
                 listing_id
             )
         )
+
         connection.commit()
         return cursor.rowcount > 0
 
@@ -119,7 +154,7 @@ def update_ride_listing(listing_id: int, listing):
 def get_all_ride_listings():
     """
     Retrieve all ride listings from the database.
-    Newest departure times are returned first.
+    Earliest departure times are returned first.
     """
     with get_connection() as connection:
         cursor = connection.execute(
