@@ -1,18 +1,32 @@
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.database.driver_listing_db import (
+    initialize_driver_listing_table
+)
 
 from app.routers.driver_listing import router as driver_listing_router
 from app.routers.safety import router as safety_router
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create the database table when the backend starts.
+    initialize_driver_listing_table()
+    yield
+
+
 app = FastAPI(
     title="FAST RideMatch API",
     description="Backend API for FAST RideMatch",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# Preserve the existing CORS configuration from main.
+# Preserve the existing CORS configuration.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Register both feature routers.
+# Register feature routers.
 app.include_router(safety_router)
 app.include_router(driver_listing_router)
 
