@@ -114,3 +114,22 @@ def update_ride_listing(listing_id: int, listing):
         )
         connection.commit()
         return cursor.rowcount > 0
+
+
+def get_all_ride_listings():
+    """
+    Retrieve all ride listings from the database.
+    Newest departure times are returned first.
+    """
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            SELECT *
+            FROM ride_listings
+            ORDER BY departure_time ASC
+            """
+        )
+
+        rows = cursor.fetchall()
+
+        return [dict(row) for row in rows]

@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.database.driver_listing_db import (
     get_ride_listing,
+    get_all_ride_listings,
     save_ride_listing,
     update_ride_listing
 )
@@ -13,6 +17,7 @@ from app.schemas.ride_listing import (
 )
 
 from app.services.driver_listing import validate_driver_listing
+from app.services.passenger_discovery import search_and_filter_rides
 
 
 router = APIRouter(
@@ -80,6 +85,48 @@ def create_ride_listing(
         **listing.model_dump(),
         "id": listing_id
     }
+
+
+@router.get(
+    "",
+    response_model=list[RideListingResponse]
+)
+def browse_ride_listings(
+    start_area: str | None = None,
+    destination_area: str | None = None,
+    departure_date: date | None = None,
+    min_fare: float | None = Query(default=None, ge=0),
+    max_fare: float | None = Query(default=None, ge=0),
+    min_seats: int | None = Query(default=None, ge=1)
+):
+    """
+    Browse and filter available future ride listings.
+    """
+
+    if (
+        min_fare is not None
+        and max_fare is not None
+        and min_fare > max_fare
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Minimum fare cannot exceed maximum fare."
+        )
+
+    rides = get_all_ride_listings()
+
+    return search_and_filter_rides(
+        rides,
+        start_area=start_area,
+        destination_area=destination_area,
+        departure_date=(
+            departure_date.isoformat()
+            if departure_date else None
+        ),
+        min_fare=min_fare,
+        max_fare=max_fare,
+        min_seats=min_seats
+    )
 
 
 @router.get(
