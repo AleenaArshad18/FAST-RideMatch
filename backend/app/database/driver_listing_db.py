@@ -192,11 +192,13 @@ def get_ride_listing(listing_id: int):
 
 def update_ride_listing(listing_id: int, listing):
     """
-    Update an existing ride listing.
+    Update an existing active ride listing.
 
     The driver_id is intentionally not updated.
     Ownership must be checked by the API before
     calling this function.
+
+    Cancelled and completed rides cannot be edited.
     """
     with get_connection() as connection:
         cursor = connection.execute(
@@ -210,6 +212,7 @@ def update_ride_listing(listing_id: int, listing):
                 vehicle_details = ?,
                 fare = ?
             WHERE id = ?
+              AND status = 'active'
             """,
             (
                 listing.start_area,
