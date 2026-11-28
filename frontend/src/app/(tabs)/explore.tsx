@@ -1,4 +1,6 @@
+
 import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Pressable,
@@ -39,6 +41,8 @@ type Ride = {
 };
 
 export default function ExploreScreen() {
+  const router = useRouter();
+
   const [rides, setRides] = useState<Ride[]>([]);
   const [startArea, setStartArea] = useState('');
   const [destinationArea, setDestinationArea] = useState('');
@@ -362,6 +366,23 @@ export default function ExploreScreen() {
           </View>
         </View>
 
+        {/* Passenger payment history shortcut */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.paymentsLink,
+            pressed && styles.pressed,
+          ]}
+          onPress={() => router.push('/passenger-payments')}
+        >
+          <View>
+            <Text style={styles.paymentsLinkTitle}>My Payments</Text>
+            <Text style={styles.paymentsLinkSubtitle}>
+              View your fare records and payment status
+            </Text>
+          </View>
+          <Text style={styles.paymentsLinkArrow}>→</Text>
+        </Pressable>
+
         <View style={styles.hero}>
           <View style={styles.heroContent}>
             <Text style={styles.heroTag}>LET'S GET MOVING</Text>
@@ -540,7 +561,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 23,
+    marginBottom: 15,
   },
   brand: {
     fontSize: 11,
@@ -570,6 +591,34 @@ const styles = StyleSheet.create({
   headerEmoji: {
     fontSize: 30,
     color: COLORS.text,
+  },
+  paymentsLink: {
+    backgroundColor: '#FFF3D1',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1E4B9',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentsLinkTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  paymentsLinkSubtitle: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginTop: 4,
+  },
+  paymentsLinkArrow: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginLeft: 10,
   },
   hero: {
     backgroundColor: COLORS.blue,
