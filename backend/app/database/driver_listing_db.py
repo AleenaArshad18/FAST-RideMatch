@@ -25,7 +25,7 @@ def initialize_driver_listing_table():
                 destination_area TEXT NOT NULL,
                 departure_time TEXT NOT NULL,
                 available_seats INTEGER NOT NULL
-                    CHECK (available_seats > 0),
+                    CHECK (available_seats >= 0),
                 vehicle_details TEXT NOT NULL,
                 fare REAL NOT NULL
                     CHECK (fare >= 0),
@@ -64,6 +64,81 @@ def initialize_driver_listing_table():
             """)
 
         connection.commit()
+
+        schema = connection.execute(
+            """
+            SELECT sql
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'ride_listings'
+            """
+        ).fetchone()
+
+        normalized_schema = "".join(
+            schema["sql"].lower().split()
+        ) if schema is not None else ""
+
+        if "available_seats>0" in normalized_schema:
+            connection.execute("PRAGMA foreign_keys = OFF")
+
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute("""
+                    CREATE TABLE ride_listings_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        driver_id INTEGER NOT NULL,
+                        start_area TEXT NOT NULL,
+                        destination_area TEXT NOT NULL,
+                        departure_time TEXT NOT NULL,
+                        available_seats INTEGER NOT NULL
+                            CHECK (available_seats >= 0),
+                        vehicle_details TEXT NOT NULL,
+                        fare REAL NOT NULL
+                            CHECK (fare >= 0),
+                        status TEXT NOT NULL DEFAULT 'active'
+                            CHECK (
+                                status IN (
+                                    'active',
+                                    'completed',
+                                    'cancelled'
+                                )
+                            )
+                    )
+                """)
+                connection.execute("""
+                    INSERT INTO ride_listings_new (
+                        id,
+                        driver_id,
+                        start_area,
+                        destination_area,
+                        departure_time,
+                        available_seats,
+                        vehicle_details,
+                        fare,
+                        status
+                    )
+                    SELECT
+                        id,
+                        driver_id,
+                        start_area,
+                        destination_area,
+                        departure_time,
+                        available_seats,
+                        vehicle_details,
+                        fare,
+                        status
+                    FROM ride_listings
+                """)
+                connection.execute("DROP TABLE ride_listings")
+                connection.execute(
+                    "ALTER TABLE ride_listings_new RENAME TO ride_listings"
+                )
+                connection.commit()
+            except sqlite3.Error:
+                connection.rollback()
+                raise
+            finally:
+                connection.execute("PRAGMA foreign_keys = ON")
 
 
 def save_ride_listing(listing):

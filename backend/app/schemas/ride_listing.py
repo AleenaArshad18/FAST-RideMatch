@@ -26,3 +26,4 @@ class RideListingUpdate(BaseModel):
 
 class RideListingResponse(RideListingCreate):
     id: int
+    available_seats: int = Field(ge=0)

@@ -50,6 +50,11 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchMessage, setSearchMessage] = useState('');
+  const [requestingRideId, setRequestingRideId] = useState<number | null>(null);
+  const [requestedRideIds, setRequestedRideIds] = useState<number[]>([]);
+  const [requestFeedback, setRequestFeedback] = useState<
+    Record<number, { type: 'success' | 'error'; message: string }>
+  >({});
 
   const fetchRides = async (useFilters = false) => {
     try {
@@ -171,6 +176,60 @@ export default function ExploreScreen() {
     });
   };
 
+  const requestRide = async (rideId: number) => {
+    setRequestingRideId(rideId);
+    setRequestFeedback((current) => {
+      const next = { ...current };
+      delete next[rideId];
+      return next;
+    });
+
+    try {
+      const response = await fetch(
+        `${API_URL}/passenger/requests`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ listing_id: rideId }),
+        }
+      );
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          responseData?.detail || 'Unable to submit your ride request.'
+        );
+      }
+
+      setRequestedRideIds((current) =>
+        current.includes(rideId) ? current : [...current, rideId]
+      );
+      setRequestFeedback((current) => ({
+        ...current,
+        [rideId]: {
+          type: 'success',
+          message: 'Request submitted. The driver can now review it.',
+        },
+      }));
+    } catch (err) {
+      setRequestFeedback((current) => ({
+        ...current,
+        [rideId]: {
+          type: 'error',
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Could not connect to the RideMatch server.',
+        },
+      }));
+    } finally {
+      setRequestingRideId(null);
+    }
+  };
+
   const renderRideCard = (ride: Ride) => (
     <View key={ride.id} style={styles.rideCard}>
       <View style={styles.rideTopRow}>
@@ -238,6 +297,45 @@ export default function ExploreScreen() {
           <Text style={styles.fareIconText}>PKR</Text>
         </View>
       </View>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.requestButton,
+          requestedRideIds.includes(ride.id) && styles.requestButtonSuccess,
+          pressed && styles.pressed,
+        ]}
+        onPress={() => void requestRide(ride.id)}
+        disabled={
+          requestingRideId !== null ||
+          requestedRideIds.includes(ride.id)
+        }
+      >
+        {requestingRideId === ride.id ? (
+          <View style={styles.requestLoading}>
+            <ActivityIndicator size="small" color="#263B2B" />
+            <Text style={styles.requestButtonText}>Submitting...</Text>
+          </View>
+        ) : (
+          <Text style={styles.requestButtonText}>
+            {requestedRideIds.includes(ride.id)
+              ? 'Request Submitted'
+              : 'Request Ride'}
+          </Text>
+        )}
+      </Pressable>
+
+      {requestFeedback[ride.id] ? (
+        <Text
+          style={[
+            styles.requestFeedback,
+            requestFeedback[ride.id].type === 'success'
+              ? styles.requestSuccess
+              : styles.requestError,
+          ]}
+        >
+          {requestFeedback[ride.id].message}
+        </Text>
+      ) : null}
     </View>
   );
 
@@ -761,6 +859,38 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#66572F',
+  },
+  requestButton: {
+    backgroundColor: COLORS.sage,
+    borderRadius: 12,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  requestButtonSuccess: {
+    backgroundColor: '#DCE8D8',
+  },
+  requestButtonText: {
+    color: '#263B2B',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  requestLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requestFeedback: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 9,
+  },
+  requestSuccess: {
+    color: '#526C50',
+  },
+  requestError: {
+    color: COLORS.red,
   },
   stateCard: {
     backgroundColor: COLORS.white,

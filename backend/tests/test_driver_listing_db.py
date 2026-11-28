@@ -169,3 +169,92 @@ def test_update_nonexistent_listing(tmp_path, monkeypatch):
 
     assert result is False
     assert driver_listing_db.get_ride_listing(999) is None
+
+
+def test_initialize_migrates_listings_to_allow_zero_seats(
+    tmp_path,
+    monkeypatch
+):
+    test_db = tmp_path / "legacy_ride_match.db"
+    monkeypatch.setattr(
+        driver_listing_db,
+        "DATABASE_PATH",
+        test_db
+    )
+
+    with driver_listing_db.get_connection() as connection:
+        connection.execute("""
+            CREATE TABLE ride_listings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                driver_id INTEGER NOT NULL,
+                start_area TEXT NOT NULL,
+                destination_area TEXT NOT NULL,
+                departure_time TEXT NOT NULL,
+                available_seats INTEGER NOT NULL
+                    CHECK (available_seats > 0),
+                vehicle_details TEXT NOT NULL,
+                fare REAL NOT NULL
+                    CHECK (fare >= 0)
+            )
+        """)
+        connection.execute("""
+            INSERT INTO ride_listings (
+                driver_id,
+                start_area,
+                destination_area,
+                departure_time,
+                available_seats,
+                vehicle_details,
+                fare
+            )
+            VALUES (1, 'A', 'B', '2030-01-01T10:00:00+00:00', 1, 'Car', 10)
+        """)
+        connection.execute("""
+            CREATE TABLE ride_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                listing_id INTEGER NOT NULL,
+                driver_id INTEGER NOT NULL,
+                passenger_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (listing_id) REFERENCES ride_listings(id)
+            )
+        """)
+        connection.execute("""
+            INSERT INTO ride_requests (
+                listing_id,
+                driver_id,
+                passenger_id,
+                created_at
+            )
+            VALUES (1, 1, 2, '2030-01-01T09:00:00+00:00')
+        """)
+        connection.commit()
+
+    driver_listing_db.initialize_driver_listing_table()
+
+    with driver_listing_db.get_connection() as connection:
+        connection.execute(
+            "UPDATE ride_listings SET available_seats = 0 WHERE id = 1"
+        )
+        connection.commit()
+
+    migrated = driver_listing_db.get_ride_listing(1)
+    assert migrated is not None
+    assert migrated["available_seats"] == 0
+    assert migrated["status"] == "active"
+
+    with driver_listing_db.get_connection() as connection:
+        request = connection.execute(
+            "SELECT listing_id FROM ride_requests WHERE id = 1"
+        ).fetchone()
+        foreign_key = connection.execute(
+            "PRAGMA foreign_key_list(ride_requests)"
+        ).fetchone()
+        violations = connection.execute(
+            "PRAGMA foreign_key_check"
+        ).fetchall()
+
+    assert request["listing_id"] == 1
+    assert foreign_key["table"] == "ride_listings"
+    assert violations == []
