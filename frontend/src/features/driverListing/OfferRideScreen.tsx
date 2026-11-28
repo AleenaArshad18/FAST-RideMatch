@@ -12,29 +12,17 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-// Local backend URL for Chrome.
-// Android emulators and physical devices need a different host.
-const API_BASE_URL = 'http://127.0.0.1:8000';
+import { ApiError } from '../../services/api';
+import {
+  getRideListing,
+  createRideListing,
+  updateRideListing,
+} from './driverListingApi';
 
 type OfferRideScreenProps = {
-  // These must come from the team's trusted login system.
   driverId?: number;
   authToken?: string;
-
-  // Omit listingId to create a ride.
-  // Supply listingId to edit an existing ride.
   listingId?: number;
-};
-
-type RideListing = {
-  id: number;
-  driver_id: number;
-  start_area: string;
-  destination_area: string;
-  departure_time: string;
-  available_seats: number;
-  vehicle_details: string;
-  fare: number;
 };
 
 export default function OfferRideScreen({
@@ -97,8 +85,9 @@ export default function OfferRideScreen({
 
   // Load existing ride information when editing.
   useEffect(() => {
-    if (!isEditMode) {
+    if (!isEditMode || listingId === undefined) {
       clearForm();
+      setIsLoadingListing(false);
       return;
     }
 
@@ -111,26 +100,16 @@ export default function OfferRideScreen({
       setSuccessMessage('');
 
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/ride-listings/${listingId}`
-        );
+        const listing = await getRideListing(listingId);
 
-        if (response.status === 404) {
-          if (!cancelled) {
-            setErrorMessage('Ride listing not found.');
-          }
+        if (cancelled) {
           return;
         }
 
-        if (!response.ok) {
-          throw new Error(
-            `Server returned ${response.status}`
+        if (listing.status !== 'active') {
+          setErrorMessage(
+            `This ride is ${listing.status} and cannot be edited.`
           );
-        }
-
-        const listing: RideListing = await response.json();
-
-        if (cancelled) {
           return;
         }
 
@@ -159,8 +138,9 @@ export default function OfferRideScreen({
 
         if (!cancelled) {
           setErrorMessage(
-            'Could not load the ride listing. ' +
-            'Please check that FastAPI is running.'
+            error instanceof ApiError
+              ? error.message
+              : 'Could not load the ride listing.'
           );
         }
       } finally {
@@ -320,7 +300,7 @@ export default function OfferRideScreen({
       driverId === undefined ||
       !Number.isSafeInteger(driverId) ||
       driverId <= 0 ||
-      !authToken
+      !authToken?.trim()
     ) {
       setErrorMessage(
         'Your ride details are valid, but verified student ' +
@@ -341,117 +321,35 @@ export default function OfferRideScreen({
       fare: Number(fare),
     };
 
-    // Creating requires driver_id.
-    // Editing deliberately excludes driver_id.
-    const requestBody = isEditMode
-      ? rideDetails
-      : {
-          driver_id: driverId,
-          ...rideDetails,
-        };
-
-    const endpoint = isEditMode
-      ? `${API_BASE_URL}/ride-listings/${listingId}`
-      : `${API_BASE_URL}/ride-listings`;
-
-    const method = isEditMode ? 'PUT' : 'POST';
-
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (response.ok) {
-        if (isEditMode) {
-          setSuccessMessage(
-            'Ride updated successfully!'
-          );
-        } else if (response.status === 201) {
-          const createdListingId = result?.id;
-
-          setSuccessMessage(
-            createdListingId !== undefined
-              ? `Ride published successfully! Listing ID: ${createdListingId}`
-              : 'Ride published successfully!'
-          );
-        } else {
-          setErrorMessage(
-            'The server returned an unexpected response.'
-          );
-        }
-
-        return;
-      }
-
-      if (response.status === 503) {
-        setErrorMessage(
-          isEditMode
-            ? 'Driver ownership verification is not ' +
-              'configured on the backend yet. ' +
-              'Updating is unavailable.'
-            : 'Student verification is not configured ' +
-              'on the backend yet. Publishing is unavailable.'
+      if (isEditMode && listingId !== undefined) {
+        await updateRideListing(
+          listingId,
+          rideDetails,
+          authToken
         );
-        return;
-      }
 
-      if (response.status === 401) {
-        setErrorMessage(
-          'Your session is not authenticated. ' +
-          'Please sign in again.'
+        setSuccessMessage('Ride updated successfully!');
+      } else {
+        const result = await createRideListing(
+          {
+            driver_id: driverId,
+            ...rideDetails,
+          },
+          authToken
         );
-        return;
-      }
 
-      if (response.status === 403) {
-        setErrorMessage(
-          isEditMode
-            ? 'You are not authorized to edit this ride.'
-            : 'You are not authorized to publish rides.'
+        setSuccessMessage(
+          `Ride published successfully! Listing ID: ${result.id}`
         );
-        return;
       }
-
-      if (response.status === 404) {
-        setErrorMessage('Ride listing not found.');
-        return;
-      }
-
-      if (
-        response.status === 400 ||
-        response.status === 422
-      ) {
-        const detail = result?.detail;
-
-        setErrorMessage(
-          typeof detail === 'string'
-            ? detail
-            : 'The backend rejected some ride details. ' +
-              'Please review your form.'
-        );
-        return;
-      }
-
-      setErrorMessage(
-        `Unable to ${isEditMode ? 'update' : 'publish'} ` +
-        `your ride. Server returned ${response.status}.`
-      );
     } catch (error) {
-      console.error('Ride submission error:', error);
-
       setErrorMessage(
-        'Could not connect to the backend. ' +
-        'Please check that FastAPI is running ' +
-        'and browser access is configured.'
+        error instanceof ApiError
+          ? error.message
+          : 'An unexpected error occurred.'
       );
     } finally {
       setIsSubmitting(false);
