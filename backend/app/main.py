@@ -8,6 +8,14 @@ from app.database.driver_listing_db import (
     initialize_driver_listing_table
 )
 
+from app.database.passenger_request_db import (
+    initialize_passenger_request_table
+)
+
+from app.database.payment_db import (
+    initialize_payment_table
+)
+
 from app.routers.driver_listing import (
     router as driver_listing_router
 )
@@ -23,20 +31,22 @@ from app.routers.driver_reliability import (
 from app.routers.driver_requests import (
     router as driver_requests_router
 )
+
 from app.routers.passenger_requests import (
     router as passenger_requests_router
 )
-from app.database.passenger_request_db import (
-    initialize_passenger_request_table
+
+from app.routers.payments import (
+    router as payments_router
 )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create or migrate the database table
-    # when the backend starts.
+    # Initialize database tables when backend starts.
     initialize_driver_listing_table()
     initialize_passenger_request_table()
+    initialize_payment_table()
     yield
 
 
@@ -64,6 +74,7 @@ app.include_router(driver_listing_router)
 app.include_router(driver_reliability_router)
 app.include_router(driver_requests_router)
 app.include_router(passenger_requests_router)
+app.include_router(payments_router)
 
 
 @app.get("/")

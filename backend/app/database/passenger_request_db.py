@@ -1,7 +1,10 @@
+
 import sqlite3
 from pathlib import Path
 
 from fastapi import HTTPException
+
+from app.database.payment_db import recalculate_payment_records
 
 
 DATABASE_PATH = (
@@ -31,12 +34,14 @@ def initialize_passenger_request_table():
                     REFERENCES ride_listings(id)
             )
         """)
+
         connection.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS
                 idx_one_pending_request_per_ride
             ON ride_requests(listing_id, passenger_id)
             WHERE status = 'pending'
         """)
+
         connection.commit()
 
 
@@ -65,6 +70,7 @@ def save_passenger_request(
                 created_at
             )
         )
+
         connection.commit()
         return cursor.lastrowid
 
@@ -79,6 +85,7 @@ def get_passenger_request(request_id: int):
             """,
             (request_id,)
         ).fetchone()
+
         return dict(row) if row is not None else None
 
 
@@ -93,10 +100,14 @@ def get_passenger_requests(passenger_id: int):
             """,
             (passenger_id,)
         ).fetchall()
+
         return [dict(row) for row in rows]
 
 
-def get_pending_passenger_request(listing_id: int, passenger_id: int):
+def get_pending_passenger_request(
+    listing_id: int,
+    passenger_id: int
+):
     with get_connection() as connection:
         row = connection.execute(
             """
@@ -109,6 +120,7 @@ def get_pending_passenger_request(listing_id: int, passenger_id: int):
             """,
             (listing_id, passenger_id)
         ).fetchone()
+
         return dict(row) if row is not None else None
 
 
@@ -123,6 +135,7 @@ def get_requests_for_driver(driver_id: int):
             """,
             (driver_id,)
         ).fetchall()
+
         return [dict(row) for row in rows]
 
 
@@ -136,6 +149,7 @@ def get_request_by_id(request_id: int):
             """,
             (request_id,)
         ).fetchone()
+
         return dict(row) if row is not None else None
 
 
@@ -145,7 +159,9 @@ def process_request_decision(
     decision: str
 ):
     if decision not in ("accept", "reject"):
-        raise ValueError(f"Unsupported request decision: {decision}")
+        raise ValueError(
+            f"Unsupported request decision: {decision}"
+        )
 
     connection = get_connection()
 
@@ -239,7 +255,10 @@ def process_request_decision(
                     detail="This ride has no available seats."
                 )
 
-        new_status = "accepted" if decision == "accept" else "rejected"
+        new_status = (
+            "accepted" if decision == "accept" else "rejected"
+        )
+
         request_update = connection.execute(
             """
             UPDATE ride_requests
@@ -257,6 +276,14 @@ def process_request_decision(
                 detail="Only pending requests can be accepted or rejected."
             )
 
+        # Create or recalculate payment records after acceptance.
+        # This is part of the same transaction as seat allocation.
+        if decision == "accept":
+            recalculate_payment_records(
+                connection,
+                request["listing_id"]
+            )
+
         connection.commit()
 
         updated_request = connection.execute(
@@ -267,9 +294,12 @@ def process_request_decision(
             """,
             (request_id,)
         ).fetchone()
+
         return dict(updated_request)
+
     except (HTTPException, sqlite3.Error):
         connection.rollback()
         raise
+
     finally:
         connection.close()
