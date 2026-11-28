@@ -16,6 +16,10 @@ from app.database.payment_db import (
     initialize_payment_table
 )
 
+from app.database.ride_lifecycle_db import (
+    initialize_ride_lifecycle_table
+)
+
 from app.routers.driver_listing import (
     router as driver_listing_router
 )
@@ -40,13 +44,18 @@ from app.routers.payments import (
     router as payments_router
 )
 
+from app.routers.ride_lifecycle import (
+    router as ride_lifecycle_router
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables when backend starts.
+    # Create or migrate database tables when backend starts.
     initialize_driver_listing_table()
     initialize_passenger_request_table()
     initialize_payment_table()
+    initialize_ride_lifecycle_table()
     yield
 
 
@@ -58,7 +67,6 @@ app = FastAPI(
 )
 
 
-# Preserve the existing CORS configuration.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -75,6 +83,7 @@ app.include_router(driver_reliability_router)
 app.include_router(driver_requests_router)
 app.include_router(passenger_requests_router)
 app.include_router(payments_router)
+app.include_router(ride_lifecycle_router)
 
 
 @app.get("/")

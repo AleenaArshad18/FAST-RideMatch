@@ -175,6 +175,13 @@ def edit_ride_listing(
             detail="You can only edit your own ride listings."
         )
 
+    # Prevent editing cancelled or completed rides.
+    if existing_listing["status"] != "active":
+        raise HTTPException(
+            status_code=409,
+            detail="Only active rides can be edited."
+        )
+
     try:
         validate_driver_listing(
             listing,
@@ -192,9 +199,17 @@ def edit_ride_listing(
     )
 
     if not updated:
+        current_listing = get_ride_listing(listing_id)
+
+        if current_listing is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Ride listing not found."
+            )
+
         raise HTTPException(
-            status_code=404,
-            detail="Ride listing not found."
+            status_code=409,
+            detail="Ride listing could not be updated."
         )
 
     return get_ride_listing(listing_id)
