@@ -19,6 +19,7 @@ from app.schemas.driver_requests import (
 )
 
 from app.services.request_gateway import (
+    DatabaseRequestGateway,
     get_request_gateway
 )
 
@@ -249,11 +250,12 @@ def test_authentication_not_configured(client):
     assert response.status_code == 503
 
 
-def test_request_gateway_not_configured(client):
+def test_request_gateway_uses_database_service(client):
     app.dependency_overrides.pop(
         get_request_gateway
     )
 
-    response = client.get("/driver/requests")
-
-    assert response.status_code == 503
+    assert isinstance(
+        get_request_gateway(),
+        DatabaseRequestGateway
+    )

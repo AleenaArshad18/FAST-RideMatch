@@ -1,11 +1,14 @@
 
 from typing import Protocol
 
-from fastapi import HTTPException
-
 from app.schemas.driver_requests import (
     DriverRequestResponse,
     DriverDecision
+)
+from app.database.passenger_request_db import (
+    get_request_by_id,
+    get_requests_for_driver,
+    process_request_decision
 )
 
 
@@ -34,14 +37,41 @@ class RequestGateway(Protocol):
 
 
 def get_request_gateway() -> RequestGateway:
-    """
-    Integration point for S06.
+    return DatabaseRequestGateway()
 
-    The authoritative request service will be
-    connected when S06 is implemented.
-    """
 
-    raise HTTPException(
-        status_code=503,
-        detail="Request processing service is not configured."
-    )
+class DatabaseRequestGateway:
+
+    def get_driver_requests(
+        self,
+        driver_id: int
+    ) -> list[DriverRequestResponse]:
+        return [
+            DriverRequestResponse.model_validate(request)
+            for request in get_requests_for_driver(driver_id)
+        ]
+
+    def get_request(
+        self,
+        driver_id: int,
+        request_id: int
+    ) -> DriverRequestResponse | None:
+        request = get_request_by_id(request_id)
+
+        if request is None:
+            return None
+
+        return DriverRequestResponse.model_validate(request)
+
+    def process_decision(
+        self,
+        driver_id: int,
+        request_id: int,
+        decision: DriverDecision
+    ) -> DriverRequestResponse:
+        request = process_request_decision(
+            driver_id=driver_id,
+            request_id=request_id,
+            decision=decision.value
+        )
+        return DriverRequestResponse.model_validate(request)
