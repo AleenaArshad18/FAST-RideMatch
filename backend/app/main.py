@@ -20,6 +20,10 @@ from app.routers.driver_reliability import (
     router as driver_reliability_router
 )
 
+from app.routers.driver_requests import (
+    router as driver_requests_router
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,6 +55,7 @@ app.add_middleware(
 app.include_router(safety_router)
 app.include_router(driver_listing_router)
 app.include_router(driver_reliability_router)
+app.include_router(driver_requests_router)
 
 
 @app.get("/")
